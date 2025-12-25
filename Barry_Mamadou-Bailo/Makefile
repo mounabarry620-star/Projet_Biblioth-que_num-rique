@@ -1,51 +1,76 @@
-# Nom de l'exécutable
+# ==============================================================================
+# FICHIER : Makefile
+# PROJET  : Gestion de Bibliothèque Numérique
+# AUTEUR  : Barry Mamadou Bailo
+# DATE    : Janvier 2026
+# ==============================================================================
+
+# --- 1. CONFIGURATION DU PROJET ---
+
+# Nom de l'exécutable final
 TARGET = app
 
 # Compilateur et options
+# -Wall -Wextra : Active tous les avertissements (bonnes pratiques)
+# -std=c++17    : Utilise le standard C++17 moderne
+# -Iinclude     : Indique au compilateur où trouver les fichiers .hpp
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -Iinclude
 
-# Dossiers
+# Structure des dossiers
 SRCDIR = src
 OBJDIR = build
 TESTDIR = tests
 
-# Liste automatique des fichiers sources .cpp (sauf ceux supprimés)
+# --- 2. DÉTECTION AUTOMATIQUE DES FICHIERS ---
+
+# Liste tous les fichiers .cpp présents dans le dossier src/
 SOURCES = $(wildcard $(SRCDIR)/*.cpp)
-# Liste automatique des fichiers objets .o correspondants
+
+# Déduit la liste des fichiers objets .o correspondants dans le dossier build/
+# (Transforme src/xxx.cpp en build/xxx.o)
 OBJECTS = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SOURCES))
 
-# Règle par défaut (ce qui se lance quand on tape juste "make")
+# --- 3. RÈGLES DE COMPILATION ---
+
+# Règle par défaut (lancée par la commande "make")
 all: $(TARGET)
 
-# Édition de liens (Création de l'exécutable)
+# Édition de liens (Linking) : Crée l'exécutable à partir des objets
+# $@ représente la cible (TARGET) et $^ représente les dépendances (OBJECTS)
 $(TARGET): $(OBJECTS)
-	@echo "====== Création de l'exécutable... ======"
+	@echo "🔨 Création de l'exécutable $(TARGET)..."
 	$(CXX) $(CXXFLAGS) -o $@ $^
-	@echo "====== Compilation terminée ! Lancez avec ./$(TARGET) ======"
+	@echo "✅ Compilation terminée avec succès ! Lancez avec : ./$(TARGET)"
 
-# Compilation des fichiers objets (.cpp -> .o)
+# Compilation séparée : Crée un fichier .o pour chaque fichier .cpp
+# $< représente le fichier source (.cpp)
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+	@# Crée le dossier build s'il n'existe pas
 	@mkdir -p $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Règle pour lancer les tests
+# --- 4. TESTS ET NETTOYAGE ---
+
+# Règle pour lancer les tests automatisés (nécessite l'exécutable)
 test: $(TARGET)
-	@echo "====== Lancement du test automatique... ======"
-	@# On rend le script exécutable
+	@echo "🧪 Lancement du scénario de test automatique..."
+	@# Rend le script exécutable (au cas où)
 	@chmod +x $(TESTDIR)/test.exp
-	@# On l'exécute
+	@# Exécute le script Expect
 	@$(TESTDIR)/test.exp
 
-# Nettoyage complet (Conforme aux exigences du prof)
+# Nettoyage complet pour rendre un dossier propre (Consigne du prof)
+# Supprime l'exécutable, les objets de compilation, et les fichiers générés par l'app
 clean:
-	@echo "====== Nettoyage des fichiers...====="
+	@echo "🧹 Nettoyage complet des fichiers..."
 	rm -rf $(OBJDIR)
 	rm -f $(TARGET)
 	rm -f library.db
 	rm -f app.conf
 	rm -f catalogue.html
 	rm -f $(TESTDIR)/livres-lot-2.csv
-	@echo "====== Dossier propre. ======"
+	@echo "✨ Dossier propre (Prêt pour l'archivage)."
 
+# .PHONY indique que ces règles ne correspondent pas à des fichiers réels
 .PHONY: all clean test

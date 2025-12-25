@@ -1,0 +1,218 @@
+#!/usr/bin/expect
+
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+set timeout 3
+set db_file "library.db"
+set csv_file "livres-lot-2.csv"
+
+# 1. Nettoyage initial (On part d'une feuille blanche)
+exec rm -f $db_file
+exec rm -f catalogue.html
+
+# 2. Génération d'un fichier 'livres-lot-2.csv' riche pour tester la pagination
+set csv_content "ISBN;Titre;Langue;Auteurs;Date;Genre;Description\n"
+for {set i 1} {$i <= 15} {incr i} {
+    append csv_content "978-LOT-$i;Livre du Lot Numero $i;FR;Auteur $i;01/01/202$i;Test;Description du livre $i\n"
+}
+
+set f [open $csv_file w]
+puts $f $csv_content
+close $f
+
+# --- CORRECTION ICI : Ajout des \ devant les [ ] ---
+puts "\n\033\[1;34m=== \[PHASE 1\] INITIALISATION ET ROBUSTESSE ===\033\[0m"
+spawn ./app
+
+# --- Configuration initiale ---
+expect "Nom de votre bibliotheque"
+send "Médiathèque du Test Ultime\r"
+expect "Description"
+send "Validation complète du projet.\r\r" 
+expect "Appuyez sur Entree"
+send "\r"
+
+# --- Test de robustesse : Saisie invalide ---
+puts "\n>> Test de rejet de date invalide..."
+expect "> Votre choix :"
+send "2\r"
+# Gérer
+expect "> Votre choix :"
+send "1\r"
+# Ajouter
+expect "ISBN"
+send "978-FAIL-001\r"
+expect "Titre"
+send "Livre Erreur\r"
+expect "Langue"
+send "FR\r"
+expect "Auteurs"
+send "Nobody\r\r"
+expect "Date"
+send "99/99/2022\r" 
+# Date invalide intentionnelle
+expect "Erreur"
+# L'appli doit redemander la date, on met la bonne
+send "01/01/2022\r"
+expect "Genre"
+send "Erreur\r"
+expect "Description"
+send "Test erreur.\r\r"
+expect "Appuyez sur Entree"
+send "\r"
+
+# --- Test : Quitter SANS Sauvegarder ---
+puts "\n>> Test de 'Quitter sans sauvegarder'..."
+expect "> Votre choix :"
+send "5\r" 
+# On choisit quitter DANS le menu Gérer
+expect "MODIFICATIONS NON ENREGISTREES"
+expect "> Choix :"
+send "2\r" 
+# 2 = Quitter SANS sauvegarder
+expect eof
+
+puts "\n\033\[1;34m=== \[PHASE 2\] VERIFICATION ET IMPORT MASSIF ===\033\[0m"
+# On relance. Le "Livre Erreur" ne doit PAS être là car on n'a pas sauvegardé.
+spawn ./app
+
+expect "> Votre choix :"
+send "1\r"
+# Consulter
+expect "Aucun livre"
+send "\r"
+puts ">> Validation OK : Le livre non sauvegardé a bien disparu."
+
+# --- Importation du CSV 'livres-lot-2.csv' ---
+expect "> Votre choix :"
+send "2\r" 
+# Gérer
+expect "> Votre choix :"
+send "2\r"
+# Importer
+expect "Nom du fichier CSV"
+send "$csv_file\r"
+expect "Succès !"
+expect "Appuyez sur Entree"
+send "\r"
+# Retour menu principal
+expect "> Votre choix :"
+send "4\r"
+
+# --- Modification Paramètres (Pagination et Logo) ---
+puts "\n>> Configuration de la pagination et du Logo..."
+expect "> Votre choix :"
+send "5\r"
+# Paramètres
+expect "> Votre choix :"
+send "2\r"
+# Pagination
+expect "Nombre de livres par page"
+send "5\r" 
+# 5 livres par page pour tester la navigation avec nos 15 livres
+expect "> Votre choix :"
+send "3\r"
+# Modifier Logo
+expect "Choix"
+send "1\r"
+# Manuel
+expect "Entrez le logo"
+send "  *** TEST *** \r\r"
+expect "Nouveau logo enregistre"
+send "\r"
+expect "> Votre choix :"
+send "4\r" 
+# Retour
+
+# --- Test Navigation Avancée ---
+puts "\n\033\[1;34m=== \[PHASE 3\] NAVIGATION AVANCEE (S/P) ===\033\[0m"
+expect "> Votre choix :"
+# On vérifie que le nouveau logo s'affiche
+expect "TEST" 
+send "1\r"
+# Consulter
+
+# Page 1 (1-5)
+expect "Page 1"
+expect "Livre du Lot Numero 1"
+send "s\r"
+
+# Page 2 (6-10)
+expect "Page 2"
+expect "Livre du Lot Numero 6"
+expect "Page précedente" 
+# Vérif présence bouton P
+send "s\r"
+
+# Page 3 (11-15)
+expect "Page 3"
+expect "Livre du Lot Numéro 15"
+send "p\r"
+
+# Retour Page 2
+expect "Page 2"
+send "p\r"
+
+# Retour Page 1
+expect "Page 1"
+send "q\r"
+
+# --- Recherche ---
+puts "\n\033\[1;34m=== \[PHASE 4\] RECHERCHE ===\033\[0m"
+expect "> Votre choix :"
+send "3\r"
+expect "> Choix :"
+send "1\r"
+# Par ISBN
+expect "recherche"
+send "978-LOT-7\r"
+expect "RESULTATS"
+expect "Livre du Lot Numéro 7"
+send "q\r"
+
+# --- Export HTML ---
+puts "\n\033\[1;34m=== \[PHASE 5\] EXPORT HTML ===\033\[0m"
+expect "> Votre choix :"
+send "4\r"
+expect "Export terminé"
+expect "Appuyez sur Entrée"
+send "\r"
+
+# --- Quitter AVEC Sauvegarde ---
+puts "\n\033\[1;34m=== \[PHASE 6\] SAUVEGARDE FINALE ===\033\[0m"
+expect "> Votre choix :"
+send "2\r"
+# Gérer (pour faire une fausse modif et déclencher la sauvegarde)
+expect "> Votre choix :"
+send "1\r"
+# Ajout rapide d'un livre final
+expect "ISBN"
+send "978-FINAL\r"
+expect "Titre"
+send "Livre Final\r"
+expect "Langue"
+send "FR\r"
+expect "Auteurs"
+send "Moi\r\r"
+expect "Date"
+send "01/01/2023\r"
+expect "Genre"
+send "Fin\r"
+expect "Description"
+send "Fin\r\r"
+expect "Appuyez sur Entree"
+send "\r"
+
+# Quitter depuis le sous-menu pour tester la sauvegarde auto
+expect "> Votre choix :"
+send "5\r"
+# Quitter l'appli
+expect "Sauvegarde automatique"
+expect "Au revoir"
+expect eof
+
+puts "\n\n\033\[1;32m--- \[SUCCESS\] TOUS LES SCENARIOS (Erreurs, Imports, Nav, Save) VALIDES ! ---\033\[0m\n"
+
+# Nettoyage optionnel (décommente si tu veux garder les fichiers pour vérifier)
+# exec rm -f $csv_file

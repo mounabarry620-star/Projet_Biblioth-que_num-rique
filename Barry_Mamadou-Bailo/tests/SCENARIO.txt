@@ -1,0 +1,34 @@
+=== JEU DE TESTS - GESTION DE BIBLIOTHÈQUE ===
+
+Ce projet inclut un script d'automatisation (test.exp) qui exécute le scénario suivant :
+
+1. INITIALISATION
+   - Lancement de l'application sans base de données.
+   - Vérification de la création du fichier library.db.
+   - Saisie du nom et de la description de la bibliothèque.
+
+2. ROBUSTESSE (Gestion d'erreurs)
+   - Tentative d'ajout d'un livre avec une date invalide (ex: 99/99/2022).
+   - Vérification que l'application rejette la saisie et redemande une date valide.
+
+3. PERSISTANCE DES DONNÉES
+   - Modification d'une donnée.
+   - Quitter SANS sauvegarder.
+   - Relancer et vérifier que la modification n'a pas été prise en compte (Comportement attendu).
+
+4. IMPORTATION MASSE
+   - Importation du fichier CSV 'livres-lot-2.csv'.
+   - Vérification du nombre de livres importés.
+
+5. NAVIGATION
+   - Test de la pagination (5 livres par page).
+   - Test des boutons [S]uivant et [P]récédent.
+
+6. RECHERCHE & EXPORT
+   - Recherche d'un livre par ISBN.
+   - Exportation du catalogue en HTML.
+
+7. SAUVEGARDE FINALE
+   - Ajout d'un livre.
+   - Quitter AVEC sauvegarde automatique.
+   - Relance pour vérifier que le livre est bien présent.

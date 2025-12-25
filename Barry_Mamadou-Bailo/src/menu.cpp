@@ -16,7 +16,7 @@
 #include <string> // Important pour std::to_string
 #include "menu.hpp"
 #include "utils.hpp"
-#include <iomanip> // Pour std::setw
+#include <iomanip> // Pour std::setw (mise en forme des colonnes)
 #include <cstdlib> // Pour std::exit()
 #include "config.hpp"
 
@@ -24,12 +24,14 @@
 // FONCTIONS UTILITAIRES D'AFFICHAGE
 // ============================================================
 
-// Prépare une cellule de texte d'une largeur fixe
+// Prépare une cellule de texte d'une largeur fixe (coupe si trop long, complète avec des espaces si trop court)
 std::string formaterCellule(std::string texte, int largeur) {
     std::string resultat;
     if ((int)texte.length() > largeur) {
+        // Si le texte dépasse, on coupe et on met "..."
         resultat = texte.substr(0, largeur - 3) + "...";
     } else {
+        // Sinon on complète avec des espaces pour aligner
         resultat = texte;
         int espaces = largeur - texte.length();
         for (int i = 0; i < espaces; i++) resultat += " ";
@@ -37,15 +39,16 @@ std::string formaterCellule(std::string texte, int largeur) {
     return resultat;
 }
 
+// Affiche la fiche complète d'un livre
 void afficherDetailsLivre(const Book& livre, const AppConfig& config) {
-    afficherHeader("DETAILS DU LIVRE", config);
+    afficherHeader("DÉTAILS DU LIVRE", config);
 
     // 1. Titre du livre avec icône et soulignement
     std::cout << "\n      " << "📘 " << CYAN << BOLD << livre.title << RESET << "\n";
     std::cout << "      " << repeat("-", livre.title.length() + 3) << "\n\n";
 
-    // 2. Informations techniques (Alignement propre)
-    // On définit une largeur de 12 pour les libellés
+    // 2. Informations techniques (Alignement propre avec setw)
+    // On définit une largeur de 12 pour les libellés pour que tout soit aligné verticalement
     
     // Auteurs
     std::cout << "      " << ITALIC << std::setw(12) << std::left << "Auteur(s)" << RESET 
@@ -76,17 +79,18 @@ void afficherDetailsLivre(const Book& livre, const AppConfig& config) {
     std::cout << "\n      " << repeat("-", 100) << "\n";
     std::cout << "      Appuyez 2 fois sur Entrée pour revenir...";
     
-    // Pause
+    // Pause pour laisser le temps de lire
     std::cin.ignore(); 
     std::cin.get();
 }
 
-// CETTE FONCTION EST LE COEUR DE L'AFFICHAGE (Réutilisée pour Consulter et Chercher)
+// CETTE FONCTION EST LE CŒUR DE L'AFFICHAGE (Réutilisée pour Consulter et Chercher)
+// Elle gère la pagination (page suivante/précédente)
 void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAfficher, std::string titreMenu, const AppConfig& config) {
    
-    int livresParPage = config.livresParPage;
+    int livresParPage = config.livresParPage; // Récupéré depuis la config
 
-    int page = 0;
+    int page = 0; // Page actuelle (commence à 0)
     int totalLivres = livresAAfficher.size();
     bool continuer = true;
 
@@ -95,8 +99,8 @@ void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAf
         // ICI : On appelle le header AVEC la config (donc le logo s'affiche)
         afficherHeader(titreMenu, config);
 
-        // Infos Bibliothèque (Maison + Titre)
-        if (titreMenu == "CONSULTER LES REFERENCES") {
+        // Infos Bibliothèque (Maison + Titre) si on est dans le menu principal de consultation
+        if (titreMenu == "CONSULTER LES RÉFÉRENCES") {
             std::cout << "  🏠 " << YELLOW << BOLD << lib.name << RESET << std::endl;
             std::cout << "      " << WHITE << lib.description << RESET << std::endl;
         }
@@ -104,23 +108,24 @@ void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAf
         // Compteur (affichera 0 si vide, ce qui est correct)
         std::cout << "\n  Nombre de livres : " << BOLD << totalLivres << RESET << std::endl;
         std::cout << "  " << repeat("-", 50) << std::endl;
-        std::cout << "  " << GREEN << ITALIC << "References" << RESET << std::endl;
+        std::cout << "  " << GREEN << ITALIC << "Références" << RESET << std::endl;
         std::cout << "  " << repeat("-", 50) << std::endl;
 
         // 2. CAS PARTICULIER : SI VIDE
         if (livresAAfficher.empty()) {
             std::cout << "\n    (o_o)  Aucun livre dans cette liste pour l'instant.\n" << std::endl;
-            // On force page à 0 et on empêche d'afficher la boucle for
-            continuer = false; // On sortira après le wait
+            // On force la sortie de boucle
+            continuer = false; 
             std::cout << "  " << repeat("-", 50) << std::endl;
             std::cout << "  Appuyez sur Entrée pour revenir...";
             std::cin.get(); 
-            return; // On quitte proprement
+            return; // On quitte proprement la fonction
         }
 
-        // 3. AFFICHAGE DE LA LISTE (S'il y a des livres)
+        // 3. CALCUL DES INDICES POUR LA PAGINATION
         int debut = page * livresParPage;
         int fin = debut + livresParPage;
+        // Si la fin dépasse le nombre total, on s'arrête au dernier livre
         if (fin > totalLivres) fin = totalLivres;
 
         /// 4. BOUCLE D'AFFICHAGE (Style Liste)
@@ -142,15 +147,19 @@ void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAf
             std::cout << std::endl; 
         }
 
-        // 4. PIED DE PAGE
+        // 4. PIED DE PAGE ET NAVIGATION
         std::cout << "  " << repeat("-", 50) << std::endl;
+        // Calcul du nombre total de pages (formule mathématique pour arrondir au supérieur)
         int nbPages = (totalLivres + livresParPage - 1) / livresParPage;
 
         std::cout << "  Page " << (page + 1) << " / " << nbPages << std::endl;
+        
+        // Affichage conditionnel des boutons [P] et [S]
         if (page > 0)
-            std::cout << "  " << (debut) << ". Page precedente [P]" << std::endl;
+            std::cout << "  " << (debut) << ". Page précédente [P]" << std::endl;
         if (fin < totalLivres)
         std::cout << "\n  " << (fin + 1) << ". Page suivante [S]" << std::endl;
+        
         std::cout << "  " << (fin + 2) << ". Retour [Q]" << std::endl;
         std::cout << "\n " << GREEN << "> Votre choix : " << RESET;
 
@@ -158,6 +167,7 @@ void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAf
         std::string choix;
         std::cin >> choix;
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Vider le buffer
+        
         // Gestion de la navigation
         if (choix == "s" || choix == "S") { 
             if (fin < totalLivres) page++; 
@@ -168,17 +178,17 @@ void afficherListePaginee(const Library& lib, const std::vector<Book>& livresAAf
             else printColor("Vous êtes à la première page.", RED);
         }
         else if (choix == "q" || choix == "Q") { 
-            continuer = false; 
+            continuer = false; // On sort de la boucle while
         }
         else {
-            // Tentative de conversion en numéro
+            // Tentative de conversion en numéro pour voir les détails d'un livre
             try {
                 int index = std::stoi(choix);
-                index--; // On passe de 1..N à 0..N-1
+                index--; // On passe de 1..N à 0..N-1 (car les tableaux commencent à 0)
                 if (index >= 0 && index < totalLivres) {
                     afficherDetailsLivre(livresAAfficher[index], config);
                 }
-            } catch (...) {}
+            } catch (...) {} // Si ce n'est pas un nombre, on ne fait rien
         }
     }
 }
@@ -193,11 +203,11 @@ void afficherMenuPrincipal(const AppConfig& config) {
     afficherHeader("MENU PRINCIPAL", config);
     
     // On utilise des couleurs différentes pour les numéros
-    std::cout << "      " << CYAN << "[1]" << RESET << " 📚 Consulter les references" << std::endl;
-    std::cout << "      " << CYAN << "[2]" << RESET << " ✨ Gerer les references (Ajout/Import/Suppr)" << std::endl;
-    std::cout << "      " << CYAN << "[3]" << RESET << " 🔍 Chercher une reference" << std::endl;
+    std::cout << "      " << CYAN << "[1]" << RESET << " 📚 Consulter les références" << std::endl;
+    std::cout << "      " << CYAN << "[2]" << RESET << " [■] Gérer les références (Ajout/Import/Suppr)" << std::endl;
+    std::cout << "      " << CYAN << "[3]" << RESET << " 🔍 Chercher une référence" << std::endl;
     std::cout << "      " << CYAN << "[4]" << RESET << " 🌐 Exporter en HTML" << std::endl;
-    std::cout << "      " << CYAN << "[5]" << RESET << " ⚙️  Parametres" << std::endl;
+    std::cout << "      " << CYAN << "[5]" << RESET << " ⚙️  Paramètres" << std::endl;
     std::cout << "      " << RED  << "[6]" << RESET << " 🚪 Quitter" << std::endl;
     
     std::cout << "\n " << GREEN << "> Votre choix : " << RESET;
@@ -207,7 +217,7 @@ void afficherMenuPrincipal(const AppConfig& config) {
 void consulterReferences(const Library& lib, const AppConfig& config) {
 
     // On passe simplement tous les livres à la fonction d'affichage
-    afficherListePaginee(lib, lib.books, "CONSULTER LES REFERENCES", config);
+    afficherListePaginee(lib, lib.books, "CONSULTER LES RÉFÉRENCES", config);
 }
 
 void chercherReferences(const Library& lib, const AppConfig& config) {
@@ -216,7 +226,7 @@ void chercherReferences(const Library& lib, const AppConfig& config) {
     afficherHeader("RECHERCHE", config);
     std::cout << "      " << CYAN << "[1]" << RESET << " Par ISBN" << std::endl;
     std::cout << "      " << CYAN << "[2]" << RESET << " Par Titre" << std::endl;
-    std::cout << "      " << CYAN << "[3]" << RESET << " Par Code Editeur" << std::endl;
+    std::cout << "      " << CYAN << "[3]" << RESET << " Par Code Éditeur" << std::endl;
     std::cout << "      " << CYAN << "[4]" << RESET << " ↩️  Retour au menu principal" << std::endl;
     std::cout << "      " << RED  << "[5]" << RESET << " 🚪 Quitter l'application" << std::endl;
     std::cout << "\n " << GREEN << "> Choix : " << RESET;
@@ -227,7 +237,7 @@ void chercherReferences(const Library& lib, const AppConfig& config) {
 
     if (choix == 4) return; // Retour au menu principal
     if (choix == 5) {       // Quitter l'application directement
-        printColor("\n  Au revoir ! A bientot.", GREEN);
+        printColor("\n  Au revoir ! À bientôt.", GREEN);
         std::exit(0);
     }
 
@@ -235,9 +245,9 @@ void chercherReferences(const Library& lib, const AppConfig& config) {
     std::string recherche;
     std::getline(std::cin, recherche);
 
-    // Vecteur qui contiendra les résultats
+    // Vecteur qui contiendra les résultats trouvés
     std::vector<Book> resultats;
-    std::string rechercheLower = toLower(recherche);
+    std::string rechercheLower = toLower(recherche); // On met tout en minuscule pour comparer
 
     for (const auto& livre : lib.books) {
         bool correspond = false;
@@ -254,8 +264,8 @@ void chercherReferences(const Library& lib, const AppConfig& config) {
             }
         }
         else if (choix == 3) {
-            // Recherche Editeur (partie de l'ISBN)
-            // L'éditeur est la 3ème partie : 978-2-XXX-...
+            // Recherche Éditeur (partie de l'ISBN)
+            // L'éditeur est généralement la 3ème partie : 978-2-XXX-...
             // On simplifie : on regarde si l'ISBN contient "-CODE-"
             if (livre.isbn.find("-" + recherche + "-") != std::string::npos) {
                 correspond = true;
@@ -263,20 +273,19 @@ void chercherReferences(const Library& lib, const AppConfig& config) {
         }
 
         if (correspond) {
-            resultats.push_back(livre);
+            resultats.push_back(livre); // On ajoute aux résultats
         }
     }
 
     if (!resultats.empty()) {
-        afficherListePaginee(lib, resultats, "RESULTATS DE RECHERCHE", config);
+        afficherListePaginee(lib, resultats, "RÉSULTATS DE RECHERCHE", config);
      } else {
         printColor("\n  Aucun résultat trouvé.", RED);
         std::cout << "  Appuyez sur Entrée..."; std::cin.get();
     }
 }
 
-// --- À placer avant gererReferences dans src/menu.cpp ---
-
+// Fonction utilitaire pour le menu d'ajout (appelée par gererReferences)
 void menuAjouterLivre(Library& lib, const AppConfig& config, bool& aDesModifs) {
     clearScreen();
     // Utilise le header avec le logo !
@@ -286,7 +295,7 @@ void menuAjouterLivre(Library& lib, const AppConfig& config, bool& aDesModifs) {
     std::cout << "  " << BOLD << "Saisie des informations :" << RESET << "\n\n";
 
     
-    // 1. ISBN (Vérification unique)
+    // 1. ISBN (Vérification unique pour éviter les doublons)
     std::cout << "ISBN-13 (ex: 978-2-...) : ";
     std::cin >> b.isbn;
     std::cin.ignore(); // Pour vider le \n restant
@@ -326,12 +335,12 @@ void menuAjouterLivre(Library& lib, const AppConfig& config, bool& aDesModifs) {
         if (estDateValide(b.date)) {
             break; // Sort de la boucle si c'est bon
         } else {
-            printColor("Erreur : Format invalide ou date incoherente (ex: 30/02). Réessayer.", 31);
+            printColor("Erreur : Format invalide ou date incohérente (ex: 30/02). Réessayer.", 31);
         }
     }
 
     // 6. Genre
-    std::cout << "Genre litteraire : ";
+    std::cout << "Genre littéraire : ";
     std::getline(std::cin, b.genre);
 
     // 7. Description (Saisie multiligne)
@@ -347,13 +356,13 @@ void menuAjouterLivre(Library& lib, const AppConfig& config, bool& aDesModifs) {
         b.description += descTemp;
     }
 
-    // Validation
+    // Validation et ajout dans la mémoire
     ajouterLivre(lib, b);
     
-    // Sauvegarde immédiate pour ne pas perdre les données
+    // On signale qu'il y a une modification (pour proposer la sauvegarde en quittant)
     aDesModifs = true;
 
-    printColor("\nLivre ajouté (Pensez a sauvegarder en quittant) !", 32);
+    printColor("\nLivre ajouté (Pensez à sauvegarder en quittant) !", 32);
     std::cout << "Appuyez sur Entrée...";
     std::cin.get();
 }
@@ -363,10 +372,10 @@ void gererReferences(Library& lib,const AppConfig& config, bool& aDesModifs) {
     do {
         clearScreen();
         // Ajoute config ici aussi
-        afficherHeader("GESTION DES REFERENCES", config);
+        afficherHeader("GESTION DES RÉFÉRENCES", config);
         std::cout << "  " << CYAN << "[1]" << RESET << " ➕ Ajouter un livre manuellement" << std::endl;
         std::cout << "  " << CYAN << "[2]" << RESET << " 📂 Importer depuis un fichier CSV" << std::endl;
-        std::cout << "  " << CYAN << "[3]" << RESET << " 🗑️  Supprimer toutes les references" << std::endl;
+        std::cout << "  " << CYAN << "[3]" << RESET << " 🗑️  Supprimer toutes les références" << std::endl;
         std::cout << "  " << CYAN << "[4]" << RESET << " ↩️  Retour au menu principal" << std::endl;
         std::cout << "\n " << GREEN << "> Votre choix : " << RESET;
 
@@ -382,10 +391,9 @@ void gererReferences(Library& lib,const AppConfig& config, bool& aDesModifs) {
                 menuAjouterLivre(lib, config, aDesModifs);
                 break;
             case 2:
-                
-                {
+                { // Bloc pour déclarer des variables locales au case
                     printColor("=== IMPORTER UN FICHIER CSV ===", 33);
-                    std::cout << "Nom du fichier CSV ou chemin (ex: livres_test.csv ou /chemin/vers/fichier.csv) : ";
+                    std::cout << "Nom du fichier CSV ou chemin (ex: livres_test.csv) : ";
                     std::string nomFichier;
                     std::getline(std::cin, nomFichier);
 
@@ -405,17 +413,17 @@ void gererReferences(Library& lib,const AppConfig& config, bool& aDesModifs) {
                 }
                 break;
             case 3:
-                { // Accolades nécessaires car on déclare des variables dans un case
+                { 
                     printColor("ATTENTION : Vous allez supprimer TOUS les livres !", 31); // Rouge
-                    std::cout << "Etes-vous sur de vouloir continuer ? (O/N) : ";
+                    std::cout << "Êtes-vous sûr de vouloir continuer ? (O/N) : ";
                     char confirm;
                     std::cin >> confirm;
                     
                     if (confirm == 'O' || confirm == 'o') {
                         supprimerToutesReferences(lib);
-                        printColor("La bibliotheque a ete videe.", 32); // Vert
+                        printColor("La bibliothèque a été vidée.", 32); // Vert
                     } else {
-                        std::cout << "Operation annulee." << std::endl;
+                        std::cout << "Opération annulée." << std::endl;
                     }
                     // Petite pause
                     std::cin.ignore(); std::cin.get(); 
@@ -423,7 +431,7 @@ void gererReferences(Library& lib,const AppConfig& config, bool& aDesModifs) {
                 break;
             case 4:
                 break; // On quitte la boucle
-            case 5: { // sauvegarde automatique avant de quitter
+            case 5: { // raccourci pour quitter
                if (aDesModifs) {
                     printColor("Sauvegarde automatique des modifications...", YELLOW);
                     sauvegarderBibliotheque(lib, "library.db");
@@ -442,7 +450,7 @@ void gererParametres(Library& lib, AppConfig& config, bool& aDesModifs) {
     do {
         clearScreen();
         // Affiche le logo + titre
-        afficherHeader("PARAMETRES", config);
+        afficherHeader("PARAMÈTRES", config);
         std::cout << "      " << CYAN << "[1]" << RESET << " 📝 Modifier titre/desc" << std::endl;
         std::cout << "      " << CYAN << "[2]" << RESET << " 📄 Livres par page (" << config.livresParPage << ")" << std::endl;
         std::cout << "      " << CYAN << "[3]" << RESET << " 🎨 Modifier le logo" << std::endl;
@@ -482,21 +490,21 @@ void gererParametres(Library& lib, AppConfig& config, bool& aDesModifs) {
 
                 // PLUS DE SAUVEGARDE AUTOMATIQUE ICI
                 if (aDesModifs) {
-                    printColor("Modifications prises en compte (Pensez a sauvegarder en quittant) !", 32);
+                    printColor("Modifications prises en compte (Pensez à sauvegarder en quittant) !", 32);
                 } else {
-                    std::cout << "Aucun changement effectue." << std::endl;
+                    std::cout << "Aucun changement effectué." << std::endl;
                 }
                 std::cin.get();
                 break;
             }
             case 2: { // Modifier Pagination (Préférences App)
-                printColor("--- Parametrer Affichage ---", 34);
+                printColor("--- Paramétrer Affichage ---", 34);
                 std::cout << "Nombre de livres par page : ";
                 int n;
                 if (std::cin >> n && n > 0) {
                     config.livresParPage = n;
                     sauvegarderConfig(config, "app.conf"); // On sauvegarde la config directe
-                    printColor("Parametre sauvegarde !", 32);
+                    printColor("Paramètre sauvegardé !", 32);
                 } else {
                     printColor("Erreur : Nombre invalide.", 31);
                 }
@@ -506,7 +514,7 @@ void gererParametres(Library& lib, AppConfig& config, bool& aDesModifs) {
             case 3: { // Modifier Logo (Préférences App)
                 printColor("--- Modifier Logo ---", 34);
                 std::cout << "1. Saisir un nouveau logo manuellement (Ligne vide pour terminer)" << std::endl;
-                std::cout << "2. Restaurer le logo par defaut" << std::endl;
+                std::cout << "2. Restaurer le logo par défaut" << std::endl;
                 std::cout << "3. Annuler" << std::endl;
                 std::cout << "> Choix : ";
                 
@@ -530,22 +538,21 @@ void gererParametres(Library& lib, AppConfig& config, bool& aDesModifs) {
                     if (!nouveauLogo.empty()) {
                         config.logo = nouveauLogo;
                         sauvegarderConfig(config, "app.conf");
-                        printColor("Nouveau logo enregistre !", 32);
+                        printColor("Nouveau logo enregistré !", 32);
                     }
                 } 
                 else if (subChoix == 2) {
-                    // --- RESET PAR DEFAUT ---
+                    // --- RESET PAR DÉFAUT ---
                     creerConfigDefaut(config); // On recrée la config par défaut
                     sauvegarderConfig(config, "app.conf");
-                    printColor("Logo par defaut restaure !", 32);
+                    printColor("Logo par défaut restauré !", 32);
                 }
                 
                 std::cin.get(); // Pause
                 break;
             }
             case 4: break;
-            case 5: {
-               // Quitter l'application directement
+            case 5: { // Quitter
                if (aDesModifs) {
                     printColor("Sauvegarde automatique des modifications...", YELLOW);
                     sauvegarderBibliotheque(lib, "library.db");

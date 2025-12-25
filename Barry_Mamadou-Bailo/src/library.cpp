@@ -10,84 +10,63 @@
  */
 
 #include <iostream>
-#include <fstream>
+#include <fstream>   // Pour lire/écrire dans les fichiers
 #include <vector>
 #include <string>
+#include <algorithm> // Pour std::sort (tri des livres) et std::replace
+#include <sstream>   // Pour std::istringstream (découpage des chaînes)
 #include "library.hpp"
-#include "utils.hpp" // Pour les couleurs et clearScreen
-#include <algorithm> // Pour std::sort
-#include <sstream>   // Pour std::istringstream
+#include "utils.hpp" 
 
-// Fonction interne pour lire un livre depuis le flux
-bool lireLivre(std::ifstream& fichier, Book& livre) {
-    std::string ligne;
-    
-    // On lit l'ISBN
-    if (!std::getline(fichier, livre.isbn)) return false;
-    
-    // Si la ligne est vide (fin de fichier potentielle), on arrête
-    if (livre.isbn.empty()) return false;
-
-    std::getline(fichier, livre.title);
-    std::getline(fichier, livre.language);
-    std::getline(fichier, livre.authors);
-    std::getline(fichier, livre.date);
-    std::getline(fichier, livre.genre);
-    
-    // Pour la description, le sujet dit "plusieurs lignes". 
-    // Pour simplifier le stockage texte simple : on va dire que la description tient sur une ligne dans la DB 
-    // (ou on utilise un marqueur spécial, mais restons simple pour l'instant).
-    std::getline(fichier, livre.description);
-    
-    return true;
-}
-
-// Fonction utilitaire pour découper une ligne CSV (par point-virgule)
-    std::vector<std::string> splitLigne(const std::string& s, char delimiter) {
+// Fonction utilitaire interne pour découper une ligne CSV.
+// Elle sépare la chaîne 's' à chaque fois qu'elle rencontre le 'delimiter' (ici ';').
+std::vector<std::string> splitLigne(const std::string& s, char delimiter) {
     std::vector<std::string> tokens;
     std::string token;
     std::istringstream tokenStream(s);
+    
+    // On lit flux par flux jusqu'au délimiteur
     while (std::getline(tokenStream, token, delimiter)) {
         tokens.push_back(token);
     }
+    // Cas particulier : si la ligne finit par un point-virgule, on ajoute une chaîne vide
+    // pour garder le bon nombre de colonnes.
     if (!s.empty() && s.back() == delimiter) {
         tokens.push_back("");
     }
     return tokens;
 }
 
-// Fonction pour nettoyer le texte avant sauvegarde (Retire les ; et les \n)
+// Fonction pour nettoyer le texte avant sauvegarde.
+// C'est crucial pour ne pas casser le format CSV : si un titre contient un ';',
+// cela créerait une colonne fantôme. On le remplace par une virgule.
 std::string nettoyerTexte(std::string s) {
-    std::replace(s.begin(), s.end(), ';', ','); // Remplace les ; par des ,
-    std::replace(s.begin(), s.end(), '\n', ' '); // Remplace les sauts de ligne par des espaces
-    s.erase(std::remove(s.begin(), s.end(), '\r'), s.end()); // Retire les retours chariot
+    std::replace(s.begin(), s.end(), ';', ',');  // Sécurité CSV
+    std::replace(s.begin(), s.end(), '\n', ' '); // On met tout sur une ligne
+    // On enlève aussi les retours chariot Windows (\r) si présents
+    s.erase(std::remove(s.begin(), s.end(), '\r'), s.end());
     return s;
 }
 
 bool chargerBibliotheque(Library& lib, const std::string& filename) {
     std::ifstream fichier(filename);
-    if (!fichier.is_open()) {
-        return false; // Le fichier n'existe pas
-    }
-       
-    
+    if (!fichier.is_open()) return false; // Le fichier n'existe pas encore
 
-    // 1. On lit explicitement la première ligne (Le Nom)
-    if (!std::getline(fichier, lib.name)) lib.name = "Ma Bibliotheque";
-
-    // 2. On lit explicitement la deuxième ligne (La Description)
-    // C'est ça qui évitera que la description soit prise pour un livre !
+    // 1. Lecture de l'en-tête (Nom et Description sur les 2 premières lignes)
+    if (!std::getline(fichier, lib.name)) lib.name = "Ma Bibliothèque";
     if (!std::getline(fichier, lib.description)) lib.description = "Description par défaut";
 
-    // 3. Ensuite, on boucle pour les livres
-    lib.books.clear();
+    // 2. Lecture des livres
+    lib.books.clear(); // On vide la liste avant de charger pour éviter les doublons
     std::string line;
+    
     while (std::getline(fichier, line)) {
         if (line.empty()) continue; // On ignore les lignes vides
 
+        // On découpe la ligne en morceaux grâce aux points-virgules
         std::vector<std::string> data = splitLigne(line, ';');
         
-        // On vérifie qu'on a bien assez de colonnes pour créer un livre
+        // On vérifie qu'on a au moins 6 colonnes pour créer un livre valide
         if (data.size() >= 6) {
             Book b;
             b.isbn = data[0];
@@ -96,7 +75,8 @@ bool chargerBibliotheque(Library& lib, const std::string& filename) {
             b.authors = data[3];
             b.date = data[4];
             b.genre = data[5];
-            // La description est optionnelle ou peut être la dernière colonne
+            
+            // La description est optionnelle, mais si elle est là, on la prend
             if (data.size() > 6) b.description = data[6];
             else b.description = "";
 
@@ -110,12 +90,14 @@ bool chargerBibliotheque(Library& lib, const std::string& filename) {
 void sauvegarderBibliotheque(const Library& lib, const std::string& filename) {
     std::ofstream fichier(filename);
     if (fichier) {
-        fichier <<nettoyerTexte(lib.name) << std::endl;
+        // En-tête : Nom et Description sur 2 lignes distinctes
+        fichier << nettoyerTexte(lib.name) << std::endl;
         fichier << nettoyerTexte(lib.description) << std::endl;
 
-        // Boucle for-each (C++11) pour parcourir le vecteur
+        // Livres : Chaque livre est écrit sur UNE SEULE ligne (format CSV).
+        // Les champs sont séparés par des points-virgules ';'.
         for (const auto& livre : lib.books) {
-           fichier << nettoyerTexte(livre.isbn) << ";"
+            fichier << nettoyerTexte(livre.isbn) << ";"
                     << nettoyerTexte(livre.title) << ";"
                     << nettoyerTexte(livre.language) << ";"
                     << nettoyerTexte(livre.authors) << ";"
@@ -125,12 +107,13 @@ void sauvegarderBibliotheque(const Library& lib, const std::string& filename) {
         }
 
     } else {
-        std::cerr << "Erreur : Impossible d'ecrire dans le fichier " << filename << std::endl;
+        std::cerr << "Erreur : Impossible d'écrire dans le fichier " << filename << std::endl;
     }
 }
 
 void initialiserBibliotheque(Library& lib) {
-    lib.name = "Ma Bibliotheque";
+    // Valeurs par défaut pour une nouvelle installation
+    lib.name = "Ma Bibliothèque";
     lib.description = "Gestionnaire de livres personnel";
     lib.books.clear();
 
@@ -138,48 +121,48 @@ void initialiserBibliotheque(Library& lib) {
 }
 
 bool isbnExiste(const Library& lib, const std::string& isbn) {
-    // On parcourt tous les livres pour voir si l'ISBN correspond
+    // On parcourt tous les livres un par un
     for (const auto& livre : lib.books) {
-        if (livre.isbn == isbn) {
-            return true;
-        }
+        // Si on trouve l'ISBN, on renvoie vrai tout de suite
+        if (livre.isbn == isbn) return true;
     }
-    return false;
+    return false; // Si on a fini la boucle sans trouver
 }
 
 void ajouterLivre(Library& lib, const Book& nouveauLivre) {
+    // Ajoute le livre à la fin du vecteur dynamique
     lib.books.push_back(nouveauLivre);
     // On pourrait trier ici, mais on le fera plus tard si besoin
 }
 
 void supprimerToutesReferences(Library& lib) {
-    lib.books.clear(); // Vide le vecteur
+    lib.books.clear(); // Vide le vecteur en mémoire
     // On sauvegarde tout de suite pour acter le changement dans le fichier
     sauvegarderBibliotheque(lib, "library.db");
 }
-// Importe les références depuis un CSV
+
 int importerReferences(Library& lib, const std::string& filename) {
     std::ifstream fichier(filename);
-    if (!fichier) return -1; // Erreur fichier
+    if (!fichier) return -1; // Erreur d'ouverture
 
-    // Détection rapide du format du fichier importé
-    // On regarde la première ligne pour voir si c'est un CSV (avec ;) ou vertical
+    // --- DETECTION DU FORMAT ---
+    // On regarde la première ligne pour deviner si c'est un CSV (avec ;) ou l'ancien format vertical
     std::string premiereLigne;
     std::getline(fichier, premiereLigne);
     
-    // On remet le curseur au début
+    // On remet le curseur de lecture au début du fichier
     fichier.clear();
     fichier.seekg(0);
 
+    // Si on ne trouve pas de ';', on suppose que c'est un format vertical (une info par ligne)
     bool estFormatVertical = (premiereLigne.find(';') == std::string::npos);
 
     int compteur = 0;
     
-    // Si c'est un CSV standard (avec point-virgule)
+    // CAS 1 : C'est un CSV standard (avec point-virgule)
     if (!estFormatVertical) {
-        std::string ligne;
-        // On ignore la première ligne si c'est des titres de colonnes
-        std::getline(fichier, ligne); 
+        std::string ligne; 
+        std::getline(fichier, ligne); // On ignore la ligne d'en-tête (Titres des colonnes)
 
         while (std::getline(fichier, ligne)) {
             if (ligne.empty()) continue;
@@ -195,11 +178,12 @@ int importerReferences(Library& lib, const std::string& filename) {
                 b.genre = data[5];
                 if (data.size() > 6) b.description = data[6];
                 
-                // Nettoyage spécifique pour import
+                // Petit nettoyage : si la description est entourée de guillemets "", on les enlève
                 if (b.description.size() >= 2 && b.description.front() == '"') {
                     b.description = b.description.substr(1, b.description.size()-2);
                 }
 
+                // On n'ajoute le livre que s'il n'existe pas déjà (pas de doublons)
                 if (!isbnExiste(lib, b.isbn)) {
                     lib.books.push_back(b);
                     compteur++;
@@ -207,54 +191,57 @@ int importerReferences(Library& lib, const std::string& filename) {
             }
         }
     } 
-    // Sinon, on tente une lecture verticale (l'ancien format)
+    // CAS 2 : Lecture verticale (pour compatibilité avec d'anciens fichiers)
     else {
         Book b;
-        while (std::getline(fichier, b.isbn)) { // Ligne 1 : ISBN
+        // On lit champ par champ, ligne par ligne
+        while (std::getline(fichier, b.isbn)) { 
             if (b.isbn.empty()) continue;
             std::getline(fichier, b.title);
             std::getline(fichier, b.language);
             std::getline(fichier, b.authors);
             std::getline(fichier, b.date);
-            std::getline(fichier, b.description); // Ligne 6 : Desc
-            std::getline(fichier, b.genre);       // Ligne 7 : Genre (Attention l'ordre variait)
+            std::getline(fichier, b.description);
+            std::getline(fichier, b.genre);       
 
-            // Petit fix si le genre a été lu dans la desc
-            // (Adaptation simple pour récupérer un maximum de données)
-            
             if (!isbnExiste(lib, b.isbn)) {
                 lib.books.push_back(b);
                 compteur++;
             }
         }
-    }    
+    }
+
+    // NOTE IMPORTANTE : On ne sauvegarde PAS automatiquement ici.
+    // L'utilisateur doit choisir de sauvegarder en quittant le menu.
+    // Cela permet d'annuler l'importation si on s'est trompé.
+    
     return compteur;
 }
 
-// === FONCTIONS UTILITAIRES POUR L'EXPORT HTML ===
+// === EXPORT HTML ===
 
-// Nettoie le titre pour le tri (enlève les articles, met en majuscule)
+// Nettoie le titre pour le tri alphabétique (enlève "Le", "La", met en majuscule...)
 std::string nettoyerTitrePourTri(std::string titre) {
     // 1. Mettre en majuscules
     std::string s = titre;
     for (auto & c: s) c = toupper(c);
 
-    // 2. Liste des préfixes à ignorer (selon le sujet)
+    // 2. Liste des préfixes à ignorer pour le tri
     const std::vector<std::string> prefixes = {
         "LE ", "LA ", "L'", "LES ", "UN ", "UNE ", "DES ", 
         "D'", "J'", "QU'", "S'"
     };
 
-    // 3. Si le titre commence par un préfixe, on l'enlève
+    // 3. Si le titre commence par un préfixe, on l'ignore
     for (const auto& p : prefixes) {
         if (s.substr(0, p.size()) == p) {
             return s.substr(p.size()); // On retourne la suite du titre
         }
     }
-    return s; // Sinon on retourne le titre tel quel
+    return s;
 }
 
-// Fonction de comparaison pour le tri
+// Fonction de comparaison utilisée par std::sort
 bool comparerLivres(const Book& a, const Book& b) {
     return nettoyerTitrePourTri(a.title) < nettoyerTitrePourTri(b.title);
 }
@@ -262,8 +249,8 @@ bool comparerLivres(const Book& a, const Book& b) {
 // === FONCTION PRINCIPALE D'EXPORT ===
 
 void exporterHTML(const Library& lib, const std::string& filename) {
-    // 1. On crée une copie de la liste des livres pour pouvoir la trier
-    // sans perturber l'ordre de la bibliothèque principale.
+    // 1. On crée une copie locale de la liste pour la trier
+    // (on ne veut pas changer l'ordre dans l'application)
     std::vector<Book> livresTries = lib.books;
     
     // 2. On trie cette liste avec notre règle spéciale
@@ -271,11 +258,11 @@ void exporterHTML(const Library& lib, const std::string& filename) {
 
     std::ofstream fichier(filename);
     if (!fichier) {
-        std::cerr << "Erreur creation HTML" << std::endl;
+        std::cerr << "Erreur lors de la création du fichier HTML" << std::endl;
         return;
     }
 
-    // 3. Écriture de l'en-tête HTML
+    // 2. Écriture de l'en-tête HTML standard
     fichier << "<!DOCTYPE html>" << std::endl;
     fichier << "<html lang='fr'>" << std::endl;
     fichier << "<head>" << std::endl;
@@ -283,35 +270,34 @@ void exporterHTML(const Library& lib, const std::string& filename) {
     fichier << "<meta name='viewport' content='width=device-width, initial-scale=1.0'>" << std::endl;
     fichier << "<title>" << lib.name << " - Catalogue</title>" << std::endl;
     
-    // CSS INTEGRE (Pas de fichier externe, conforme au sujet)
+    // CSS Intégré (Pour que le fichier HTML soit autonome et joli)
     fichier << "<style>" << std::endl;
-    fichier << "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding-bottom: 50px; }" << std::endl;
-    fichier << ".container { max-width: 900px; margin: 0 auto; padding: 20px; }" << std::endl;
+    fichier << "body { font-family: sans-serif; background-color: #f4f4f9; color: #333; margin: 20px; }" << std::endl;
+    fichier << ".container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }" << std::endl;
+    fichier << "h1 { text-align: center; color: #2c3e50; }" << std::endl;
+    fichier << ".subtitle { text-align: center; color: #7f8c8d; font-style: italic; margin-bottom: 30px; }" << std::endl;
     
-    // Header et Index
-    fichier << "h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }" << std::endl;
-    fichier << ".subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; font-style: italic; }" << std::endl;
+    // Style de la barre d'index (A B C D...)
+    fichier << ".index-bar { text-align: center; margin-bottom: 20px; }" << std::endl;
+    fichier << ".index-bar a { display: inline-block; padding: 5px 10px; margin: 2px; text-decoration: none; color: white; background-color: #3498db; border-radius: 4px; }" << std::endl;
     
-    fichier << ".index-bar { position: sticky; top: 0; background: white; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; z-index: 100; }" << std::endl;
-    fichier << ".index-bar a { display: inline-block; padding: 5px 10px; margin: 2px; text-decoration: none; color: #fff; background-color: #3498db; border-radius: 4px; font-weight: bold; font-size: 14px; transition: background 0.3s; }" << std::endl;
-    fichier << ".index-bar a:hover { background-color: #2980b9; }" << std::endl;
-    fichier << ".index-bar span { display: inline-block; padding: 5px 10px; margin: 2px; color: #bdc3c7; font-size: 14px; }" << std::endl;
-
-    // Sections et Livres
-    fichier << "h2 { border-bottom: 2px solid #3498db; color: #3498db; padding-bottom: 5px; margin-top: 40px; }" << std::endl;
-    
-    fichier << ".livre-card { background: white; border-left: 5px solid #3498db; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 0 5px 5px 0; }" << std::endl;
-    fichier << ".livre-titre { font-size: 1.2em; font-weight: bold; color: #2c3e50; }" << std::endl;
-    fichier << ".livre-infos { color: #7f8c8d; font-size: 0.9em; margin-top: 5px; }" << std::endl;
-    fichier << ".livre-isbn { font-family: monospace; background: #eee; padding: 2px 5px; border-radius: 3px; }" << std::endl;
+    // Style des cartes de livres
+    fichier << "h2 { border-bottom: 2px solid #3498db; color: #3498db; margin-top: 30px; }" << std::endl;
+    fichier << ".livre-card { border-left: 5px solid #3498db; padding: 10px 15px; margin-bottom: 15px; background: #f9f9f9; }" << std::endl;
+    fichier << ".livre-titre { font-weight: bold; font-size: 1.1em; }" << std::endl;
+    fichier << ".livre-infos { font-size: 0.9em; color: #555; }" << std::endl;
     fichier << "</style>" << std::endl;
     fichier << "</head>" << std::endl;
     
     fichier << "<body>" << std::endl;
+    fichier << "<div class='container'>" << std::endl;
+    fichier << "<h1>" << lib.name << "</h1>" << std::endl;
+    fichier << "<p class='subtitle'>" << lib.description << "</p>" << std::endl;
 
-    // INDEX
+    // 3. Génération de l'index Alphabétique
     fichier << "<div class='index-bar'>" << std::endl;
     std::string lettresPresentes = "";
+    // On repère quelles lettres sont utilisées
     for (const auto& livre : livresTries) {
         std::string cle = nettoyerTitrePourTri(livre.title);
         char premiereLettre = cle[0];
@@ -320,6 +306,7 @@ void exporterHTML(const Library& lib, const std::string& filename) {
             lettresPresentes += premiereLettre;
         }
     }
+    // On affiche les liens
     std::string alphabet = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (char c : alphabet) {
         if (lettresPresentes.find(c) != std::string::npos) {
@@ -328,36 +315,32 @@ void exporterHTML(const Library& lib, const std::string& filename) {
             fichier << "<span>" << c << "</span>";
         }
     }
-    fichier << "</div>" << std::endl; // Fin index
+    fichier << "</div>" << std::endl;
 
-    fichier << "<div class='container'>" << std::endl;
-    fichier << "<h1>" << lib.name << "</h1>" << std::endl;
-    fichier << "<p class='subtitle'>" << lib.description << "</p>" << std::endl;
-
-    // CONTENU
+    // 4. Génération du contenu (Livres)
     char sectionActuelle = 0;
     for (const auto& livre : livresTries) {
         std::string cle = nettoyerTitrePourTri(livre.title);
         char lettre = cle[0];
         if (!isalpha(lettre)) lettre = '#';
 
+        // Si on change de lettre, on crée une nouvelle section
         if (lettre != sectionActuelle) {
             sectionActuelle = lettre;
             fichier << "<h2 id='section-" << sectionActuelle << "'>" << sectionActuelle << "</h2>" << std::endl;
         }
 
-        // Carte de livre
+        // Affichage du livre
         fichier << "<div class='livre-card'>" << std::endl;
         fichier << "<div class='livre-titre'>" << livre.title << "</div>" << std::endl;
         fichier << "<div class='livre-infos'>" << std::endl;
         fichier << "Par <strong>" << livre.authors << "</strong> &bull; ";
-        fichier << "ISBN: <span class='livre-isbn'>" << livre.isbn << "</span> &bull; ";
+        fichier << "ISBN: " << livre.isbn << " &bull; ";
         fichier << livre.date << std::endl;
         fichier << "</div>" << std::endl;
-        // On peut ajouter le résumé si tu veux, mais le sujet montrait une liste simple.
-        // fichier << "<p style='font-size:0.9em; margin-top:10px;'>" << livre.description << "</p>" << std::endl;
         fichier << "</div>" << std::endl;
     }
+
     fichier << "</div>" << std::endl; // Fin container
 
     fichier << "</body></html>" << std::endl;

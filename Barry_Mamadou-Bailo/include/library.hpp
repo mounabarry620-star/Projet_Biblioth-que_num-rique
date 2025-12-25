@@ -1,12 +1,11 @@
 /**
- * @file library.cpp
- * @brief Gestion des données de la bibliothèque (Livres, Import/Export).
+ * @file library.hpp
+ * @brief Définition de la structure Library et des fonctions de gestion.
  * @author Barry Mamadou Bailo
  * @version 1.0
  *
- * Contient les fonctions de manipulation des livres : ajout, suppression,
- * vérification d'ISBN, importation CSV et l'exportation du catalogue en HTML.
- * Gère également la persistance des données via library.db.
+ * Ce fichier contient la définition de la bibliothèque (qui contient une liste de livres)
+ * et les prototypes des fonctions pour manipuler ces données (ajout, import, export...).
  */
 
 #ifndef LIBRARY_HPP
@@ -14,42 +13,48 @@
 
 #include <string>
 #include <vector>
-#include "book.hpp" // On a besoin de connaître la structure Book
+#include "book.hpp" // Nécessaire car la structure Library utilise la structure Book
 
-#include <string>
-#include <vector>
-#include "book.hpp" // On a besoin de connaître la structure Book
-
+// Structure principale représentant la bibliothèque
 struct Library {
-    std::string name;           // Le nom de la bibliothèque
-    std::string description;    // La description de la bibliothèque
-    std::vector<Book> books;    // La liste dynamique de tous les livres (CM5)
+    std::string name;               // Le nom de la bibliothèque (ex: "Ma Biblio Perso")
+    std::string description;        // Une description affichée dans le menu
+    
+    // J'utilise std::vector car c'est un tableau dynamique qui gère la mémoire automatiquement.
+    // Cela permet d'ajouter autant de livres que l'on veut sans connaître la taille à l'avance.
+    std::vector<Book> books;        
 };
 
-// Fonctions de gestion de la bibliothèque
-// Charge les données depuis le fichier DB
+// --- FONCTIONS DE GESTION DES FICHIERS ---
+
+// Charge les données depuis le fichier DB au démarrage.
+// Retourne 'true' si le fichier a été trouvé et chargé, 'false' sinon.
 bool chargerBibliotheque(Library& lib, const std::string& filename);
 
-// Sauvegarde les données dans le fichier DB
+// Sauvegarde les données actuelles dans le fichier DB.
+// Le paramètre 'lib' est 'const' pour garantir qu'on ne modifie pas les données pendant la sauvegarde.
 void sauvegarderBibliotheque(const Library& lib, const std::string& filename);
 
-// Initialise une nouvelle bibliothèque (demande à l'utilisateur)
+// Initialise une nouvelle bibliothèque avec des valeurs par défaut si aucun fichier n'existe.
 void initialiserBibliotheque(Library& lib);
 
-// Vérifie si un ISBN existe déjà dans la bibliothèque
+// --- FONCTIONS DE MANIPULATION DES LIVRES ---
+
+// Vérifie si un ISBN existe déjà dans la liste pour éviter les doublons.
+// Retourne true si trouvé.
 bool isbnExiste(const Library& lib, const std::string& isbn);
 
-// Ajoute un livre à la bibliothèque
+// Ajoute un livre à la fin du vecteur 'books'.
 void ajouterLivre(Library& lib, const Book& nouveauLivre);
 
-// Supprime tous les livres de la bibliothèque
+// Vide le vecteur de livres (suppression totale).
 void supprimerToutesReferences(Library& lib);
 
-// Importe des livres depuis un fichier CSV
-// Retourne le nombre de livres importés
+// Importe des livres depuis un fichier CSV externe.
+// Retourne le nombre entier de livres ajoutés avec succès.
 int importerReferences(Library& lib, const std::string& filename);
 
-// Exporte la bibliothèque dans un fichier HTML avec tri et index
+// Génère une page Web (HTML) listant tous les livres, triés par titre.
 void exporterHTML(const Library& lib, const std::string& filename);
 
-#endif
+#endif // LIBRARY_HPP

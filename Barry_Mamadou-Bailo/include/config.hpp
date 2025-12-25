@@ -1,5 +1,5 @@
 /**
- * @file config.cpp
+ * @file config.hpp
  * @brief Gestion de la configuration persistante de l'application.
  * @author Barry Mamadou Bailo
  * @version 1.0
@@ -14,20 +14,26 @@
 #include <string>
 #include <vector>
 
+// Structure pour regrouper tous les paramètres de l'application.
+// Cela permet de passer une seule variable 'config' aux fonctions au lieu de plusieurs.
 struct AppConfig {
-    int livresParPage = 5;       // Valeur par défaut
-    std::string logo;            // Le logo ASCII
+    int livresParPage = 5;       // Valeur par défaut si aucun fichier de config n'est trouvé
+    std::string logo;            // Le dessin (logo ASCII) affiché en haut du menu
 };
 
-// Charge la config depuis le fichier. Retourne false si le fichier n'existe pas.
+// Charge la config depuis le fichier texte.
+// Retourne 'false' si le fichier n'existe pas (ce qui permet de savoir s'il faut créer celui par défaut).
+// Le paramètre 'config' est passé par référence (&) pour être modifié directement par la fonction.
 bool chargerConfig(AppConfig& config, const std::string& filename);
 
-// Crée une config par défaut (avec le logo du sujet)
+// Remplit la structure 'config' avec les valeurs d'origine (le logo du sujet).
 void creerConfigDefaut(AppConfig& config);
 
-// Sauvegarde la config dans le fichier
+// Sauvegarde la configuration actuelle dans un fichier.
+// Le paramètre est 'const' car la sauvegarde ne doit pas modifier les données, juste les lire.
 void sauvegarderConfig(const AppConfig& config, const std::string& filename);
-// Réinitialise le logo ASCII aux valeurs par défaut
+
+// Fonction utilitaire pour remettre uniquement le logo à zéro sans toucher au reste (ex: pagination).
 void reinitialiserLogo(AppConfig& config);
 
 #endif

@@ -39,9 +39,9 @@ all: $(TARGET)
 # Édition de liens (Linking) : Crée l'exécutable à partir des objets
 # $@ représente la cible (TARGET) et $^ représente les dépendances (OBJECTS)
 $(TARGET): $(OBJECTS)
-	@echo "🔨 Création de l'exécutable $(TARGET)..."
+	@echo "======= Création de l'exécutable $(TARGET)... ======="
 	$(CXX) $(CXXFLAGS) -o $@ $^
-	@echo "✅ Compilation terminée avec succès ! Lancez avec : ./$(TARGET)"
+	@echo "======Compilation terminée avec succès ! Lancez avec : ./$(TARGET)======"
 
 # Compilation séparée : Crée un fichier .o pour chaque fichier .cpp
 # $< représente le fichier source (.cpp)
@@ -54,7 +54,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 
 # Règle pour lancer les tests automatisés (nécessite l'exécutable)
 test: $(TARGET)
-	@echo "🧪 Lancement du scénario de test automatique..."
+	@echo "=========== Lancement du scénario de test automatique..."
 	@# Rend le script exécutable (au cas où)
 	@chmod +x $(TESTDIR)/test.exp
 	@# Exécute le script Expect
@@ -63,14 +63,14 @@ test: $(TARGET)
 # Nettoyage complet pour rendre un dossier propre (Consigne du prof)
 # Supprime l'exécutable, les objets de compilation, et les fichiers générés par l'app
 clean:
-	@echo "🧹 Nettoyage complet des fichiers..."
+	@echo "======= Nettoyage complet des fichiers... ======="
 	rm -rf $(OBJDIR)
 	rm -f $(TARGET)
 	rm -f library.db
 	rm -f app.conf
 	rm -f catalogue.html
 	rm -f $(TESTDIR)/livres-lot-2.csv
-	@echo "✨ Dossier propre (Prêt pour l'archivage)."
+	@echo "======= Dossier propre (Prêt pour l'archivage).========"
 
 # .PHONY indique que ces règles ne correspondent pas à des fichiers réels
 .PHONY: all clean test

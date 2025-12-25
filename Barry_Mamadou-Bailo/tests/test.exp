@@ -3,46 +3,50 @@
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-set timeout 3
+# On laisse un peu de temps au programme pour répondre (5 secondes max)
+set timeout 5
 set db_file "library.db"
 set csv_file "livres-lot-2.csv"
 
-# 1. Nettoyage initial (On part d'une feuille blanche)
+# 1. On nettoie tout pour commencer le test sur une base propre
 exec rm -f $db_file
 exec rm -f catalogue.html
 
-# 2. Génération d'un fichier 'livres-lot-2.csv' riche pour tester la pagination
-# CORRECTION DATE : On utilise [expr] pour calculer une année valide (4 chiffres)
+# 2. On génère un fichier CSV pour tester l'importation
+# On calcule l'année pour avoir toujours 4 chiffres (ex: 2011, 2012...)
 set csv_content "ISBN;Titre;Langue;Auteurs;Date;Genre;Description\n"
 for {set i 1} {$i <= 15} {incr i} {
     set annee [expr 2010 + $i]
     append csv_content "978-LOT-$i;Livre du Lot Numero $i;FR;Auteur $i;01/01/$annee;Test;Description du livre $i\n"
 }
 
+# On écrit le contenu dans le fichier
 set f [open $csv_file w]
 puts $f $csv_content
 close $f
 
-# --- DEBUT DU TEST ---
-puts "\n\033\[1;34m=== \[PHASE 1\] INITIALISATION ET ROBUSTESSE ===\033\[0m"
+# ==============================================================================
+# PHASE 1 : PREMIER LANCEMENT ET GESTION D'ERREUR
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 1\] INITIALISATION ET TEST D'ERREURS ===\033\[0m"
 spawn ./app
 
-# --- Configuration initiale ---
-expect "Nom de votre bibliotheque"
+# --- On remplit le formulaire de départ ---
+expect "Nom de votre bibliothèque"
 send "Médiathèque du Test Ultime\r"
 expect "Description"
 send "Validation complète du projet.\r\r" 
-expect "Appuyez sur Entree"
-send "\r"
+expect "Appuyez 2 fois sur Entrée"
+send "\r\r"
 
-# --- Test de robustesse : Saisie invalide ---
-puts "\n>> Test de rejet de date invalide..."
+# --- On teste si l'appli rejette une date invalide ---
+puts "\n>> Test : On essaie de mettre une mauvaise date..."
 expect "> Votre choix :"
 send "2\r"
-# Gérer
+# Menu Gérer
 expect "> Votre choix :"
 send "1\r"
-# Ajouter
+# Ajouter un livre
 expect "ISBN"
 send "978-FAIL-001\r"
 expect "Titre"
@@ -50,45 +54,43 @@ send "Livre Erreur\r"
 expect "Langue"
 send "FR\r"
 expect "Auteurs"
-send "Nobody\r\r"
+send "Personne\r\r"
 expect "Date"
 send "99/99/2022\r" 
-# Date invalide intentionnelle
+# L'appli doit dire "Erreur"
 expect "Erreur"
-# L'appli doit redemander la date, on met la bonne
+# On corrige avec une bonne date
 send "01/01/2022\r"
 expect "Genre"
 send "Erreur\r"
 expect "Description"
-send "Test erreur.\r\r"
-expect "Appuyez sur Entree"
+send "Ce livre ne doit pas être sauvegardé.\r\r"
+expect "Appuyez sur Entrée"
 send "\r"
 
-# --- Test : Quitter SANS Sauvegarder ---
-puts "\n>> Test de 'Quitter sans sauvegarder'..."
+# --- On quitte SANS sauvegarder pour voir si ça marche ---
+puts "\n>> Test : On quitte sans sauvegarder..."
+# On retourne au menu principal d'abord
 expect "> Votre choix :"
-send "5\r" 
-# On choisit quitter DANS le menu Gérer (raccourci ajouté) ou via retour
-# Si ton menu Gérer a 4 options, le 5 quitte. Sinon adapte le script.
-# Ici on suppose que le menu Gérer a une option Quitter ou on retourne au menu principal
-# Pour être sûr, on retourne au menu principal puis on quitte
-# (Adapter selon ton menu actuel, ici je fais 4 pour retour puis 6 pour quitter)
 
-# RETOUR MENU PRINCIPAL pour être sûr
 send "4\r" 
 expect "> Votre choix :"
 send "6\r"
-# Menu Quitter
-expect "MODIFICATIONS NON ENREGISTREES"
+# Le programme doit nous avertir !
+expect "MODIFICATIONS NON ENREGISTRÉES"
 expect "> Choix :"
 send "2\r" 
-# 2 = Quitter SANS sauvegarder
+# Choix 2 = Quitter sans sauvegarder
 expect eof
 
-puts "\n\033\[1;34m=== \[PHASE 2\] VERIFICATION ET IMPORT MASSIF ===\033\[0m"
-# On relance. Le "Livre Erreur" ne doit PAS être là car on n'a pas sauvegardé.
+# ==============================================================================
+# PHASE 2 : IMPORTATION ET VÉRIFICATION
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 2\] VERIFICATION ET IMPORTATION ===\033\[0m"
+# On relance le programme.
 spawn ./app
 
+# On vérifie que le "Livre Erreur" a bien disparu
 expect "> Votre choix :"
 send "1\r"
 # Consulter
@@ -96,68 +98,69 @@ expect "Aucun livre"
 send "\r"
 puts ">> Validation OK : Le livre non sauvegardé a bien disparu."
 
-# --- Importation du CSV 'livres-lot-2.csv' ---
+# --- On importe le fichier CSV qu'on a créé au début ---
 expect "> Votre choix :"
 send "2\r" 
-# Gérer
+# Menu Gérer
 expect "> Votre choix :"
 send "2\r"
 # Importer
 expect "Nom du fichier CSV"
 send "$csv_file\r"
 expect "Succès !"
-expect "Appuyez sur Entree"
+expect "Appuyez sur Entrée"
 send "\r"
-# Retour menu principal
+# Retour au menu principal
 expect "> Votre choix :"
 send "4\r"
 
-# --- Modification Paramètres (Pagination et Logo) ---
-puts "\n>> Configuration de la pagination et du Logo..."
+# --- On change les paramètres (Pagination et Logo) ---
+puts "\n>> Test : Modification des paramètres..."
 expect "> Votre choix :"
 send "5\r"
-# Paramètres
+# Menu Paramètres
 expect "> Votre choix :"
 send "2\r"
-# Pagination
+# Changer nombre de livres par page
 expect "Nombre de livres par page"
 send "5\r" 
-# 5 livres par page pour tester la navigation avec nos 15 livres
+# On met 5 pour tester les pages
 expect "> Votre choix :"
 send "3\r"
-# Modifier Logo
+# Modifier le Logo
 expect "Choix"
 send "1\r"
-# Manuel
-expect "Entrez le logo"
+# Saisie manuelle
+expect "Entrez votre nouveau logo"
 send "  *** TEST *** \r\r"
-expect "Nouveau logo enregistre"
+expect "Nouveau logo enregistré"
 send "\r"
 expect "> Votre choix :"
 send "4\r" 
-# Retour
+# Retour Menu Principal
 
-# --- Test Navigation Avancée ---
-puts "\n\033\[1;34m=== \[PHASE 3\] NAVIGATION AVANCEE (S/P) ===\033\[0m"
+# ==============================================================================
+# PHASE 3 : NAVIGATION (PAGES)
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 3\] TEST DE LA NAVIGATION (Suivant/Précédent) ===\033\[0m"
 expect "> Votre choix :"
-# On vérifie que le nouveau logo s'affiche
+# On vérifie que notre logo "TEST" s'affiche bien
 expect "TEST" 
 send "1\r"
 # Consulter
 
-# Page 1 (1-5)
+# Page 1 (Livres 1 à 5)
 expect "Page 1"
 expect "Livre du Lot Numero 1"
 send "s\r"
 
-# Page 2 (6-10)
+# Page 2 (Livres 6 à 10)
 expect "Page 2"
 expect "Livre du Lot Numero 6"
-expect "Page precedente" 
-# Vérif présence bouton P
+expect "Page précédente" 
 send "s\r"
 
-# Page 3 (11-15)
+# Page 3 (Livres 11 à 15)
 expect "Page 3"
 expect "Livre du Lot Numero 15"
 send "p\r"
@@ -170,35 +173,41 @@ send "p\r"
 expect "Page 1"
 send "q\r"
 
-# --- Recherche ---
-puts "\n\033\[1;34m=== \[PHASE 4\] RECHERCHE ===\033\[0m"
+# ==============================================================================
+# PHASE 4 : RECHERCHE
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 4\] TEST DE LA RECHERCHE ===\033\[0m"
 expect "> Votre choix :"
 send "3\r"
 expect "> Choix :"
 send "1\r"
-# Par ISBN
+# Recherche par ISBN
 expect "recherche"
 send "978-LOT-7\r"
-expect "RESULTATS"
+expect "RÉSULTATS"
 expect "Livre du Lot Numero 7"
 send "q\r"
 
-# --- Export HTML ---
+# ==============================================================================
+# PHASE 5 : EXPORT HTML
+# ==============================================================================
 puts "\n\033\[1;34m=== \[PHASE 5\] EXPORT HTML ===\033\[0m"
 expect "> Votre choix :"
 send "4\r"
-expect "Export termine"
-expect "Appuyez sur Entree"
+expect "Export terminé"
+expect "Appuyez sur Entrée"
 send "\r"
 
-# --- Quitter AVEC Sauvegarde ---
-puts "\n\033\[1;34m=== \[PHASE 6\] SAUVEGARDE FINALE ===\033\[0m"
+# ==============================================================================
+# PHASE 6 : AJOUT FINAL ET SAUVEGARDE
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 6\] SAUVEGARDE AVANT DE QUITTER ===\033\[0m"
 expect "> Votre choix :"
 send "2\r"
-# Gérer (pour faire une fausse modif et déclencher la sauvegarde)
+# Menu Gérer
 expect "> Votre choix :"
 send "1\r"
-# Ajout rapide d'un livre final
+# Ajouter un dernier livre manuellement
 expect "ISBN"
 send "978-FINAL\r"
 expect "Titre"
@@ -212,27 +221,71 @@ send "01/01/2023\r"
 expect "Genre"
 send "Fin\r"
 expect "Description"
-send "Fin\r\r"
-expect "Appuyez sur Entree"
+send "C'est la fin.\r\r"
+expect "Appuyez sur Entrée"
 send "\r"
 
 # Retour au menu principal
 expect "> Votre choix :"
 send "4\r"
 
-# Quitter l'appli depuis le menu principal (6)
+# On quitte l'application (Choix 6)
 expect "> Votre choix :"
 send "6\r"
-# Menu Quitter (détection modif)
-expect "MODIFICATIONS NON ENREGISTREES"
+# Le programme voit qu'on a ajouté un livre, il doit demander de sauvegarder
+expect "MODIFICATIONS NON ENREGISTRÉES"
 expect "> Choix :"
 send "1\r" 
-# 1 = Sauvegarder et quitter
-expect "Sauvegarde effectuee"
+# Choix 1 = Sauvegarder et quitter
+expect "Sauvegarde effectuée"
 expect "Au revoir"
 expect eof
 
-puts "\n\n\033\[1;32m--- \[SUCCESS\] TOUS LES SCENARIOS (Erreurs, Imports, Nav, Save) VALIDES ! ---\033\[0m\n"
+# ==============================================================================
+# PHASE 7 : VERIFICATION PERSISTANCE ET SECURITE PARAMETRES
+# ==============================================================================
+puts "\n\033\[1;34m=== \[PHASE 7\] VERIFICATION FINALE ET PARAMETRES ===\033\[0m"
+# On relance une dernière fois
+spawn ./app
 
-# Nettoyage optionnel (décommente si tu veux garder les fichiers pour vérifier)
-# exec rm -f $csv_file
+expect "> Votre choix :"
+send "1\r"
+# Consulter
+expect "Livre Final"
+puts ">> Validation OK : Le dernier livre est bien resté en mémoire."
+# On sort de la consultation (il faut faire q, parfois plusieurs pages)
+send "q\r" 
+# Si on est sur la page 1, q suffit.
+
+# --- Test du piège dans les paramètres ---
+puts "\n>> Test : Modification du Titre et tentative de fuite..."
+expect "> Votre choix :"
+send "5\r"
+# Menu Paramètres
+expect "> Votre choix :"
+send "1\r"
+# Modifier le Titre
+expect "Titre actuel"
+send "Bibliotheque MODIFIEE\r"
+expect "Description actuelle"
+send "\r"
+# On ne change pas la description
+expect "Appuyez sur Entrée"
+send "\r"
+
+# ATTENTION : On essaie de quitter DIRECTEMENT depuis les paramètres (Choix 5)
+expect "> Votre choix :"
+send "5\r"
+# Le programme doit nous bloquer !
+expect "MODIFICATIONS NON ENREGISTRÉES"
+expect "> Choix :"
+send "1\r"
+# On sauvegarde et on part
+expect "Sauvegarde effectuée"
+expect "Au revoir"
+expect eof
+
+puts "\n\n\033\[1;32m--- \[SUCCÈS\] TOUS LES TESTS SONT PASSÉS ! BRAVO ! ---\033\[0m\n"
+
+# On supprime le fichier CSV de test pour laisser le dossier propre
+exec rm -f $csv_file

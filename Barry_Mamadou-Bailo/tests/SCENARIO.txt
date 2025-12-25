@@ -1,34 +1,62 @@
-=== JEU DE TESTS - GESTION DE BIBLIOTHÈQUE ===
+========================================================================
+SCÉNARIO DE TEST AUTOMATISÉ (test.exp)
+Projet : Gestion de Bibliothèque C++
+Auteur : Barry Mamadou Bailo
+========================================================================
 
-Ce projet inclut un script d'automatisation (test.exp) qui exécute le scénario suivant :
+DESCRIPTION GLOBALE
+-------------------
+Ce fichier décrit les étapes exécutées par le script 'tests/test.exp'.
+L'objectif est de simuler le comportement d'un utilisateur réel pour valider
+la robustesse, la persistance des données et l'interface utilisateur.
 
-1. INITIALISATION
-   - Lancement de l'application sans base de données.
-   - Vérification de la création du fichier library.db.
-   - Saisie du nom et de la description de la bibliothèque.
+DÉROULEMENT DU SCÉNARIO (7 PHASES)
+----------------------------------
 
-2. ROBUSTESSE (Gestion d'erreurs)
-   - Tentative d'ajout d'un livre avec une date invalide (ex: 99/99/2022).
-   - Vérification que l'application rejette la saisie et redemande une date valide.
+PHASE 1 : INITIALISATION ET ROBUSTESSE
+   - Objectif : Simuler un premier lancement (aucune donnée existante).
+   - Action : Le script supprime 'library.db' et lance l'application.
+   - Test d'erreur : Tentative d'ajout d'un livre avec une date invalide (99/99/2022).
+     -> Résultat attendu : L'application rejette la saisie et redemande une date.
+   - Test d'annulation : On simule un utilisateur qui quitte le menu sans sauvegarder.
+     -> Résultat attendu : Les données saisies ne doivent PAS être enregistrées.
 
-3. PERSISTANCE DES DONNÉES
-   - Modification d'une donnée.
-   - Quitter SANS sauvegarder.
-   - Relancer et vérifier que la modification n'a pas été prise en compte (Comportement attendu).
+PHASE 2 : IMPORTATION MASSE
+   - Objectif : Peupler la bibliothèque rapidement.
+   - Action : Importation automatique du fichier 'livres-lot-2.csv' (généré par le script).
+   - Vérification : L'application doit confirmer l'importation de 15 livres.
 
-4. IMPORTATION MASSE
-   - Importation du fichier CSV 'livres-lot-2.csv'.
-   - Vérification du nombre de livres importés.
+PHASE 3 : NAVIGATION ET ERGONOMIE
+   - Objectif : Tester l'affichage paginé.
+   - Action : Modification des paramètres pour afficher 5 livres par page.
+   - Action : Personnalisation du logo (ASCII Art) pour vérifier la config 'app.conf'.
+   - Navigation : Utilisation des commandes 's' (Suivant) et 'p' (Précédent) pour parcourir les 3 pages.
 
-5. NAVIGATION
-   - Test de la pagination (5 livres par page).
-   - Test des boutons [S]uivant et [P]récédent.
+PHASE 4 : MOTEUR DE RECHERCHE
+   - Objectif : Valider le filtrage des données.
+   - Action : Recherche d'un livre spécifique par son ISBN.
+   - Résultat attendu : Seul le livre correspondant doit s'afficher.
 
-6. RECHERCHE & EXPORT
-   - Recherche d'un livre par ISBN.
-   - Exportation du catalogue en HTML.
+PHASE 5 : EXPORTATION WEB
+   - Objectif : Vérifier la fonctionnalité HTML.
+   - Action : Génération du fichier 'catalogue.html'.
 
-7. SAUVEGARDE FINALE
-   - Ajout d'un livre.
-   - Quitter AVEC sauvegarde automatique.
-   - Relance pour vérifier que le livre est bien présent.
+PHASE 6 : SAUVEGARDE ET SÉCURITÉ
+   - Objectif : Vérifier que l'application ne laisse pas partir l'utilisateur sans sauvegarder.
+   - Action : Ajout manuel d'un "Livre Final".
+   - Action : Tentative de quitter l'application.
+   - Résultat attendu : L'alerte "MODIFICATIONS NON ENREGISTRÉES" doit apparaître.
+   - Action : Confirmation de la sauvegarde et sortie.
+
+PHASE 7 : VÉRIFICATION DE LA PERSISTANCE (Relance)
+   - Objectif : S'assurer que les données sont bien stockées sur le disque.
+   - Action : Relance complète de l'application.
+   - Vérification : Le "Livre Final" ajouté en Phase 6 doit être présent.
+   - Test Bonus : Modification du titre de la bibliothèque dans les Paramètres, puis tentative de quitter.
+     -> Résultat attendu : L'alerte de sauvegarde doit fonctionner aussi depuis ce menu.
+
+------------------------------------------------------------------------
+COMMENT LANCER CE TEST ?
+Dans le terminal, à la racine du projet :
+$ make test
+------------------------------------------------------------------------

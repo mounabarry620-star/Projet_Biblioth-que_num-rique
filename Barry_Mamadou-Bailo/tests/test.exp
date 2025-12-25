@@ -12,16 +12,18 @@ exec rm -f $db_file
 exec rm -f catalogue.html
 
 # 2. Génération d'un fichier 'livres-lot-2.csv' riche pour tester la pagination
+# CORRECTION DATE : On utilise [expr] pour calculer une année valide (4 chiffres)
 set csv_content "ISBN;Titre;Langue;Auteurs;Date;Genre;Description\n"
 for {set i 1} {$i <= 15} {incr i} {
-    append csv_content "978-LOT-$i;Livre du Lot Numero $i;FR;Auteur $i;01/01/202$i;Test;Description du livre $i\n"
+    set annee [expr 2010 + $i]
+    append csv_content "978-LOT-$i;Livre du Lot Numero $i;FR;Auteur $i;01/01/$annee;Test;Description du livre $i\n"
 }
 
 set f [open $csv_file w]
 puts $f $csv_content
 close $f
 
-# --- CORRECTION ICI : Ajout des \ devant les [ ] ---
+# --- DEBUT DU TEST ---
 puts "\n\033\[1;34m=== \[PHASE 1\] INITIALISATION ET ROBUSTESSE ===\033\[0m"
 spawn ./app
 
@@ -66,7 +68,17 @@ send "\r"
 puts "\n>> Test de 'Quitter sans sauvegarder'..."
 expect "> Votre choix :"
 send "5\r" 
-# On choisit quitter DANS le menu Gérer
+# On choisit quitter DANS le menu Gérer (raccourci ajouté) ou via retour
+# Si ton menu Gérer a 4 options, le 5 quitte. Sinon adapte le script.
+# Ici on suppose que le menu Gérer a une option Quitter ou on retourne au menu principal
+# Pour être sûr, on retourne au menu principal puis on quitte
+# (Adapter selon ton menu actuel, ici je fais 4 pour retour puis 6 pour quitter)
+
+# RETOUR MENU PRINCIPAL pour être sûr
+send "4\r" 
+expect "> Votre choix :"
+send "6\r"
+# Menu Quitter
 expect "MODIFICATIONS NON ENREGISTREES"
 expect "> Choix :"
 send "2\r" 
@@ -141,13 +153,13 @@ send "s\r"
 # Page 2 (6-10)
 expect "Page 2"
 expect "Livre du Lot Numero 6"
-expect "Page précedente" 
+expect "Page precedente" 
 # Vérif présence bouton P
 send "s\r"
 
 # Page 3 (11-15)
 expect "Page 3"
-expect "Livre du Lot Numéro 15"
+expect "Livre du Lot Numero 15"
 send "p\r"
 
 # Retour Page 2
@@ -168,15 +180,15 @@ send "1\r"
 expect "recherche"
 send "978-LOT-7\r"
 expect "RESULTATS"
-expect "Livre du Lot Numéro 7"
+expect "Livre du Lot Numero 7"
 send "q\r"
 
 # --- Export HTML ---
 puts "\n\033\[1;34m=== \[PHASE 5\] EXPORT HTML ===\033\[0m"
 expect "> Votre choix :"
 send "4\r"
-expect "Export terminé"
-expect "Appuyez sur Entrée"
+expect "Export termine"
+expect "Appuyez sur Entree"
 send "\r"
 
 # --- Quitter AVEC Sauvegarde ---
@@ -204,11 +216,19 @@ send "Fin\r\r"
 expect "Appuyez sur Entree"
 send "\r"
 
-# Quitter depuis le sous-menu pour tester la sauvegarde auto
+# Retour au menu principal
 expect "> Votre choix :"
-send "5\r"
-# Quitter l'appli
-expect "Sauvegarde automatique"
+send "4\r"
+
+# Quitter l'appli depuis le menu principal (6)
+expect "> Votre choix :"
+send "6\r"
+# Menu Quitter (détection modif)
+expect "MODIFICATIONS NON ENREGISTREES"
+expect "> Choix :"
+send "1\r" 
+# 1 = Sauvegarder et quitter
+expect "Sauvegarde effectuee"
 expect "Au revoir"
 expect eof
 

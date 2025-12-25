@@ -553,14 +553,36 @@ void gererParametres(Library& lib, AppConfig& config, bool& aDesModifs) {
                 break;
             }
             case 4: break;
-            case 5: { // Quitter
+            case 5: { // Quitter avec sauvegarde si besoin
                if (aDesModifs) {
-                    printColor("Sauvegarde automatique des modifications...", YELLOW);
-                    sauvegarderBibliotheque(lib, "library.db");
-                    printColor("(v) Sauvegarde réussie.", GREEN);
+                    clearScreen();
+                    printColor("=== MODIFICATIONS NON ENREGISTRÉES ===", 31); 
+                    std::cout << "Vous avez des modifications en attente." << std::endl;
+                    std::cout << "1. Sauvegarder et quitter" << std::endl;
+                    std::cout << "2. Quitter sans sauvegarder" << std::endl;
+                    std::cout << "3. Annuler (Ne pas quitter)" << std::endl;
+                    std::cout << "> Choix : ";
+                    
+                    int sousChoix;
+                    std::cin >> sousChoix;
+                    
+                    if (sousChoix == 1) {
+                        sauvegarderBibliotheque(lib, "library.db");
+                        printColor("Sauvegarde effectuée. Au revoir !", 32);
+                        std::exit(0);
+                    }
+                    else if (sousChoix == 2) {
+                        printColor("Modifications perdues. Au revoir !", 33);
+                        std::exit(0);
+                    }
+                    else {
+                        // Annulation : on ne fait rien, on revient au menu paramètres
+                    }
+                } else {
+                    printColor("Au revoir !", 34); 
+                    std::exit(0);
                 }
-                printColor("Au revoir !", GREEN); 
-                std::exit(0);
+                break;
             }
         }
     } while (choix != 4);

@@ -421,6 +421,7 @@ void gererReferences(Library& lib,const AppConfig& config, bool& aDesModifs) {
                     
                     if (confirm == 'O' || confirm == 'o') {
                         supprimerToutesReferences(lib);
+                        aDesModifs = true; // Signale la modification
                         printColor("La bibliothèque a été vidée.", 32); // Vert
                     } else {
                         std::cout << "Opération annulée." << std::endl;

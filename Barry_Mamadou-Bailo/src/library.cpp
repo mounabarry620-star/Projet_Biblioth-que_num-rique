@@ -137,8 +137,9 @@ void ajouterLivre(Library& lib, const Book& nouveauLivre) {
 
 void supprimerToutesReferences(Library& lib) {
     lib.books.clear(); // Vide le vecteur en mémoire
-    // On sauvegarde tout de suite pour acter le changement dans le fichier
-    sauvegarderBibliotheque(lib, "library.db");
+    
+    // On ne sauvegarde plus automatiquement.
+    // L'utilisateur devra confirmer la sauvegarde en quittant le menu.
 }
 
 int importerReferences(Library& lib, const std::string& filename) {
